@@ -1,0 +1,1667 @@
+---
+title: "Project 2: Full Implementation"
+author: "Bailey Joseph and Deborah Chang"
+date: "4/29/2019"
+output: html_document
+---
+
+```{r}
+library(gridExtra)
+library(ggplot2)
+library(stringr)
+library(htmlTable)
+source("helpers.R")
+library(reshape2)
+library(corrplot)
+
+# Load the Data
+img1 <- data.frame(read.table("image_data/image1.txt", stringsAsFactors=FALSE))
+colnames(img1) <- c("y coordinate", "x coordinate", "expert label", "NDAI", "SD", "CORR", "Radiance angle DF", "Radiance angle CF", "Radiance angle BF", "Radiance angle AF", "Radiance angle AN")
+img1$image <- 1
+
+img2 <- data.frame(read.table("image_data/image2.txt", stringsAsFactors=FALSE))
+colnames(img2) <- c("y coordinate", "x coordinate", "expert label", "NDAI", "SD", "CORR", "Radiance angle DF", "Radiance angle CF", "Radiance angle BF", "Radiance angle AF", "Radiance angle AN")
+img2$image <- 2
+
+img3 <- data.frame(read.table("image_data/image3.txt", stringsAsFactors=FALSE))
+colnames(img3) <- c("y coordinate", "x coordinate", "expert label", "NDAI", "SD", "CORR", "Radiance angle DF", "Radiance angle CF", "Radiance angle BF", "Radiance angle AF", "Radiance angle AN")
+img3$image <- 3
+
+colnames(img1) <- str_replace_all(colnames(img1), " ", "_")
+colnames(img2) <- str_replace_all(colnames(img2), " ", "_")
+colnames(img3) <- str_replace_all(colnames(img3), " ", "_")
+```
+
+
+# Part 1: Data Collection and Exploration  
+
+```{r}
+# =========================================================
+# Part B: Summarize the Data
+# =========================================================
+## Summarize
+### Image 1
+str(img1)
+summary(img1)
+
+# % of pixels for the different classes (+1, -1, 0)
+img1 %>%
+  group_by(expert_label) %>%
+  summarise(count = n()/nrow(img1)) %>%
+  arrange(desc(count))
+# 44% of pixels are clear, 39% are unlabeled, and 17% are cloudy.
+
+### Image 2
+str(img2)
+summary(img2)
+
+# % of pixels for the different classes (+1, -1, 0)
+img2 %>%
+  group_by(expert_label) %>%
+  summarise(count = n()/nrow(img2)) %>%
+  arrange(desc(count))
+# 37% of pixels are clear, 29% are unlabeled, and 34% are cloudy.
+
+### Image 3
+str(img3)
+summary(img3)
+
+# % of pixels for the different classes (+1, -1, 0)
+img3 %>%
+  group_by(expert_label) %>%
+  summarise(count = n()/nrow(img3)) %>%
+  arrange(desc(count))
+# 29% of pixels are clear, 52% are unlabeled, and 18% are cloudy.
+
+
+### Images Combined 
+
+img <- rbind(img1,img2,img3)
+str(img)
+summary(img)
+
+# % of pixels for the different classes (+1, -1, 0)
+img %>%
+  group_by(expert_label) %>%
+  summarise(count = n()/nrow(.)) %>% # mean
+  arrange(desc(count))
+# 36% of pixels are clear, 40% are unlabeled, and 23% are cloudy.
+
+## Maps
+# "Plot well-labeled beautiful maps using x, y coordinates the expert labels with color of the region based on the expert labels." 
+# Plot labels using x, y coordinates as x, y axis.  Use color wisely.
+
+# Map of Image 1
+img1 %>%
+  mutate(`Expert Label` = factor(expert_label, labels = c("Clear", "No Label", "Cloudy"))) %>%
+ggplot(aes(x=x_coordinate, y = -y_coordinate, color = `Expert Label`)) + geom_point() + ggtitle("Map of Image 1") +  ylab("Negative Y Coordinate") + scale_color_manual(values=c("cyan", "lightblue", "blue"))  + xlab("X Coordinate")
+
+# Map of Image 2
+img2 %>%
+  mutate(`Expert Label` = factor(expert_label, labels = c("Clear", "No Label", "Cloudy"))) %>%
+ggplot(aes(x=x_coordinate, y = -y_coordinate, color = `Expert Label`)) + geom_point() + ggtitle("Map of Image 2") +  ylab("Negative Y Coordinate") + labs("Expert Label") + scale_color_manual(values=c("cyan", "lightblue", "blue")) + xlab("X Coordinate")
+
+# Map of Image 3
+img3 %>%
+  mutate(`Expert Label` = factor(expert_label, labels = c("Clear", "No Label", "Cloudy"))) %>%
+  ggplot(aes(x=x_coordinate, y = y_coordinate, color = `Expert Label`)) + geom_point() + ggtitle("Map of Image 3") + scale_color_manual(values=c("cyan", "lightblue", "blue")) + ylab("Y Coordinate") + xlab("X Coordinate")
+
+```
+
+
+```{r}
+# =========================================================
+# Part C: Visual and Quantiative EDA
+# =========================================================
+
+# (i) Between Features themselves
+
+# Image 1
+
+## NDAI and SD 
+
+# By X
+averageNDAIbyX1 <- data.frame(img1 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+averageSDbyX1 <- data.frame(img1 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+ndaiandSDX1 <- data.frame(cbind(averageNDAIbyX1$averageNDAI, averageSDbyX1$averageSD,averageNDAIbyX1$x_coordinate)) 
+
+# By Y
+averageNDAIbyY1 <- data.frame(img1 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+averageSDbyY1 <- data.frame(img1 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+ndaiandSDY1 <- data.frame(cbind(averageNDAIbyY1$averageNDAI, averageSDbyY1$averageSD,averageNDAIbyY1$y_coordinate)) 
+
+## CORR and SD
+
+# By X
+averageCORRbyX1 <- data.frame(img1 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+corrandSDX1 <- data.frame(cbind(averageCORRbyX1$averageCORR, averageSDbyX1$averageSD,averageNDAIbyX1$x_coordinate)) 
+
+# By Y
+averageCORRbyY1 <- data.frame(img1 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+corrandSDY1 <- data.frame(cbind(averageCORRbyY1$averageCORR, averageSDbyY1$averageSD,averageNDAIbyY1$y_coordinate)) 
+
+# CORR and NDAI
+
+# By X
+corrandNDAIX1 <- data.frame(cbind(averageCORRbyX1$averageCORR, averageNDAIbyX1$averageNDAI,averageNDAIbyX1$x_coordinate)) 
+
+# By Y
+
+corrandNDAIY1 <- data.frame(cbind(averageCORRbyY1$averageCORR, averageNDAIbyY1$averageNDAI, averageNDAIbyY1$y_coordinate)) 
+
+# pixel by pixel
+
+ggplot(data = img1, aes(x = CORR, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5)
+
+# ----------------
+
+# Image 1
+
+## NDAI and SD 
+par(mfrow=c(3,3))
+
+#By X
+p1 <- ggplot(ndaiandSDX1, aes(x = ndaiandSDX1[,1], y = ndaiandSDX1[,2],color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: SD versus NDAI by X Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "X Coordinate") 
+
+#By Y
+
+p2 <- ggplot(ndaiandSDY1, aes(x = ndaiandSDY1[,1], y = ndaiandSDY1[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: SD versus NDAI by Y Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "Y Coordinate") 
+
+#pixel by pixel
+p3 <- ggplot(data = img1, aes(x = SD, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 1: NDAI versus SD")
+## CORR and SD
+
+
+#By X 
+
+p4 <- ggplot(corrandSDX1, aes(x = corrandSDX1[,1], y = corrandSDX1[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: SD versus CORR by X") + xlab("Average CORR") + ylab("Average SD") + labs(color = "X Coordinate") 
+
+#By Y
+
+p5 <- ggplot(corrandSDY1, aes(x = corrandSDY1[,1], y = corrandSDY1[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: SD versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average SD") + labs(color = "Y Coordinate")
+
+# pixel by pixel
+
+p6 <- ggplot(data = img1, aes(x = CORR, y = SD)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 1: SD versus CORR")
+
+# CORR and NDAI
+
+#By X
+
+p7 <- ggplot(corrandNDAIX1, aes(x = corrandNDAIX1[,1], y = corrandNDAIX1[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: NDAI versus CORR by X Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "X Coordinate")
+
+#By Y
+
+
+p8 <- ggplot(corrandNDAIY1, aes(x = corrandNDAIY1[,1], y = corrandNDAIY1[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 1: NDAI versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "Y Coordinate") 
+#pixel by pixel
+
+p9 <- ggplot(data = img1, aes(x = CORR, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 1: NDAI versus CORR")
+
+# Combine (Image 1)
+
+grid.arrange(p1,p2,p4,p5,p7,p8)
+grid.arrange(p3,p6,p9)
+
+# Image 2
+
+## NDAI and SD 
+
+# By X
+averageNDAIbyX2 <- data.frame(img2 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+
+
+averageSDbyX2 <- data.frame(img2 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+
+
+ndaiandSDX2 <- data.frame(cbind(averageNDAIbyX2$averageNDAI, averageSDbyX2$averageSD, averageNDAIbyX2$x_coordinate)) 
+
+img2p1 <- ggplot(ndaiandSDX2, aes(x = ndaiandSDX2[,1], y = ndaiandSDX2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: SD versus NDAI by X Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "X Coordinate") 
+# By Y
+
+averageNDAIbyY2 <- data.frame(img2 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+averageSDbyY2 <- data.frame(img2 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+ndaiandSDY2 <- data.frame(cbind(averageNDAIbyY2$averageNDAI, averageSDbyY2$averageSD, averageSDbyY2$y_coordinate)) 
+img2p2 <-ggplot(ndaiandSDY2, aes(x = ndaiandSDY2[,1], y = ndaiandSDY2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: SD versus NDAI by Y Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "Y Coordinate") 
+
+
+# pixel by pixel
+
+img2p3 <- ggplot(data = img2, aes(x = SD, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 2: NDAI versus SD")
+
+## CORR and SD
+
+# By X 
+
+averageCORRbyX2 <- data.frame(img2 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+corrandSDX2 <- data.frame(cbind(averageCORRbyX2$averageCORR, averageSDbyX2$averageSD, averageSDbyX2$x_coordinate)) 
+img2p4 <-ggplot(corrandSDX2, aes(x = corrandSDX2[,1], y = corrandSDX2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: SD versus CORR by X Coordinate") + xlab("Average CORR") + ylab("Average SD") + labs(color = "X Coordinate") 
+
+
+# By Y
+
+
+averageCORRbyY2 <- data.frame(img2 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+
+
+corrandSDY2 <- data.frame(cbind(averageCORRbyY2$averageCORR, averageSDbyY2$averageSD, averageSDbyY2$y_coordinate)) 
+img2p5 <-ggplot(corrandSDY2, aes(x = corrandSDY2[,1], y = corrandSDY2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: SD versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average SD") + labs(color = "Y Coordinate") 
+
+
+
+# pixel by pixel
+
+img2p6 <-ggplot(data = img2, aes(x = CORR, y = SD)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 2: SD versus CORR")
+
+
+# CORR and NDAI
+
+# By X
+
+
+corrandNDAIX2 <- data.frame(cbind(averageCORRbyX2$averageCORR, averageNDAIbyX2$averageNDAI, averageNDAIbyX2$x_coordinate)) 
+img2p7 <-ggplot(corrandNDAIX2, aes(x = corrandNDAIX2[,1], y = corrandNDAIX2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: NDAI versus CORR by X Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "X Coordinate") 
+
+
+# By Y
+
+
+
+corrandNDAIY2 <- data.frame(cbind(averageCORRbyY2$averageCORR, averageNDAIbyY2$averageNDAI, averageNDAIbyY2$y_coordinate)) 
+img2p8 <-ggplot(corrandNDAIY2, aes(x = corrandNDAIY2[,1], y = corrandNDAIY2[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 2: NDAI versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "Y Coordinate") 
+
+
+
+# pixel by pixel
+
+img2p9 <- ggplot(data = img2, aes(x = CORR, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 2: NDAI versus CORR")
+
+
+#Combine (Image 2)
+
+grid.arrange(img2p1,img2p2,img2p4,img2p5,img2p7,img2p8)
+grid.arrange(img2p3,img2p6,img2p9)
+
+# Image 3
+
+## NDAI and SD 
+
+# By X
+
+
+averageNDAIbyX3 <- data.frame(img3 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+
+
+averageSDbyX3 <- data.frame(img3 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+
+
+ndaiandSDX3 <- data.frame(cbind(averageNDAIbyX3$averageNDAI, averageSDbyX3$averageSD, averageNDAIbyX3$x_coordinate)) 
+img3p1 <- ggplot(ndaiandSDX3, aes(x = ndaiandSDX3[,1], y = ndaiandSDX3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: SD versus NDAI by X Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "X Coordinate")
+
+
+# By Y
+
+
+averageNDAIbyY3 <- data.frame(img3 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageNDAI = mean(NDAI)))
+
+averageSDbyY3 <- data.frame(img3 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageSD = mean(SD)))
+
+ndaiandSDY3 <- data.frame(cbind(averageNDAIbyY3$averageNDAI, averageSDbyY3$averageSD, averageSDbyY3$y_coordinate)) 
+img3p2 <- ggplot(ndaiandSDY3, aes(x = ndaiandSDY3[,1], y = ndaiandSDY3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: SD versus NDAI by Y Coordinate") + xlab("Average NDAI") + ylab("Average SD") + labs(color = "Y Coordinate") 
+# pixel by pixel
+
+img3p3 <- ggplot(data = img3, aes(x = SD, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 3: NDAI versus SD")
+
+## CORR and SD
+
+# By X 
+
+averageCORRbyX3 <- data.frame(img3 %>%
+  group_by(x_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+corrandSDX3 <- data.frame(cbind(averageCORRbyX3$averageCORR, averageSDbyX3$averageSD, averageSDbyX3$x_coordinate)) 
+img3p4 <-ggplot(corrandSDX3, aes(x = corrandSDX3[,1], y = corrandSDX3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: SD versus CORR by X Coordinate") + xlab("Average CORR") + ylab("Average SD") + labs(color = "X Coordinate") 
+# By Y
+averageCORRbyY3 <- data.frame(img3 %>%
+  group_by(y_coordinate) %>%
+   summarise(averageCORR = mean(CORR)))
+
+corrandSDY3 <- data.frame(cbind(averageCORRbyY3$averageCORR, averageSDbyY3$averageSD, averageSDbyY3$y_coordinate)) 
+img3p5 <-ggplot(corrandSDY3, aes(x = corrandSDY3[,1], y = corrandSDY3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: SD versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average SD") + labs(color = "Y Coordinate") 
+
+
+
+# pixel by pixel
+
+img3p6 <-ggplot(data = img3, aes(x = CORR, y = SD)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 3: SD versus CORR")
+
+
+# CORR and NDAI
+
+# By X
+
+
+corrandNDAIX3 <- data.frame(cbind(averageCORRbyX3$averageCORR, averageNDAIbyX3$averageNDAI, averageNDAIbyX3$x_coordinate)) 
+img3p7 <-ggplot(corrandNDAIX3, aes(x = corrandNDAIX3[,1], y = corrandNDAIX3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: NDAI versus CORR by X Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "X Coordinate") 
+
+
+# By Y
+
+
+
+corrandNDAIY3 <- data.frame(cbind(averageCORRbyY3$averageCORR, averageNDAIbyY3$averageNDAI, averageCORRbyY3$y_coordinate)) 
+img3p8 <-ggplot(corrandNDAIY3, aes(x = corrandNDAIY3[,1], y = corrandNDAIY3[,2], color = X3)) + geom_point(alpha =0.7) + ggtitle("Image 3: NDAI versus CORR by Y Coordinate") + xlab("Average CORR") + ylab("Average NDAI") + labs(color = "Y Coordinate") 
+
+
+# pixel by pixel
+
+img3p9 <-ggplot(data = img3, aes(x = CORR, y = NDAI)) + geom_point(alpha = 0.1, size = 0.5) + ggtitle("Image 3: NDAI versus CORR")
+
+
+# Combine (Image 3)
+
+grid.arrange(img3p1,img3p2,img3p4,img3p5,img3p7,img3p8)
+grid.arrange(img3p3,img3p6,img3p9)
+
+
+# (ii) Between Class (+1,0,-1) Labels and Features
+
+# Do you notice differences between the two classes (cloud, no cloud) based on the radiance or other  features (CORR, NDAI,SD)?
+
+#Group By Images and Labels
+
+imgv2 <- data.frame(cbind(img$expert_label, img$NDAI, img$SD, img$CORR, img$image))
+colnames(imgv2) <- c("Expert Label", "NDAI", "SD", "CORR",  "Image")
+
+averageFeaturesByLabels <- data.frame(imgv2 %>%
+  group_by(Image, `Expert Label`) %>%
+  summarise_all(mean))
+
+averageFeaturesByLabels <- round(averageFeaturesByLabels,2)
+
+htmlTable(averageFeaturesByLabels, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Average Feature Measurements by Expert Labels")
+```
+
+# Part 2: Preparation  
+
+```{r}
+# =========================================================
+# Part A: Split the Data
+# =========================================================
+
+# Split Method 1
+
+set.seed(13)
+train_img <- sample(1:3, 1) # This is img3
+valid_img <- sample(c(1,2,3)[-train_img], 1) # This is img1
+test_img <- c(1,2,3)[-c(train_img, valid_img)] # Remaining is img2
+
+train_and_valid_method_1 <- img1 %>%
+  bind_rows(img3) 
+
+# Get the train and validation features, leaving in the x_coordinate and y_coordinate columns
+# We will need the x_coordinate and y_coordinate columns for the splitting function to work. 
+method_1_train_and_valid_features <- img1 %>%
+  bind_rows(img3) %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  select(y_coordinate:x_coordinate, NDAI:Radiance_angle_AN)
+
+
+# Get the response as 0/1
+method_1_train_and_valid_response <- img1 %>%
+  bind_rows(img3) %>%
+  # Be careful here that you haven't already mutated img2 to be 0/1, because if so,
+  # you'll lose all the 0s. 
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+# Get the test features.
+# We don't really need the y_coordinate or x_coordinate columns, 
+#   but I'm leaving them in just so it's consistent with the training and validation version
+method_1_test_features <- img2 %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  select(y_coordinate:x_coordinate, NDAI:Radiance_angle_AN)
+
+
+# Get the test response as 0/1
+method_1_test_response <- img2 %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+
+
+kmean_for_split <- kmeans(train_and_valid_method_1 %>% select(x_coordinate, y_coordinate), 7)
+train_and_valid_method_1 %>%
+  mutate(Group = factor(kmean_for_split$cluster)) %>%
+  ggplot(aes(x = x_coordinate, y = y_coordinate, color = Group)) +
+    geom_point() +
+    labs(title = "Method 1 Splits on Train and Validation Together",
+         subtitle = "*The test set is a whole, completely untouched image.",
+         x = "X-Coordinate",
+         y = "Y-Coordinate") +
+    theme_clean()
+
+ggsave("images/split_method_1.png", height = 5, width = 5, units = "in", dpi = 300)
+
+
+# Split Method 2
+
+# Need to divide x and y into 4 quantiles each
+
+get_num_bigger_than <- function(x, quants) {
+  return(max(1, sum(x > quants)))
+}
+
+split_xy_16 <- function(image_data, x_col_num, y_col_num) {
+    image_data %>%
+    mutate(x_group = vapply(image_data[ ,x_col_num],
+                          1,
+                          FUN = get_num_bigger_than,
+                          quants = quantile(image_data[ ,x_col_num])),
+           y_group = vapply(image_data[ ,y_col_num],
+                          1,
+                          FUN = get_num_bigger_than,
+                          quants = quantile(image_data[ ,y_col_num])),
+           group_lab = factor((x_group - 1)*4 + y_group)) 
+  
+}
+# ----------------------------------
+# Visual Unit Test
+split_xy_16(img1, 2, 1) %>%
+  rename(Group = group_lab) %>%
+  ggplot(aes(x = `x_coordinate`, y = `y_coordinate`, color = Group)) +
+    geom_point() +
+    labs(title = "Splitting Method Two Applied to One Image",
+         subtitle = "*Method 2 splits each separate image independently.",
+         x = "X-Coordinate",
+         y = "Y-Coordinate") +
+    theme_clean()
+ggsave("images/split_method_2.png", height = 5, width = 5, units = "in", dpi = 300)
+# ----------------------------------
+
+# Get 8 from each img1, 2, 3
+
+set.seed(1)
+train_bucks_1 <- sample(1:16, 8)
+val_bucks_1 <- sample(c(1:16)[-train_bucks_1], 4)
+test_bucks_1 <- c(1:16)[-c(train_bucks_1, val_bucks_1)]
+
+set.seed(2)
+train_bucks_2 <- sample(1:16, 8)
+val_bucks_2 <- sample(c(1:16)[-train_bucks_2], 4)
+test_bucks_2 <- c(1:16)[-c(train_bucks_2, val_bucks_2)]
+
+set.seed(3)
+train_bucks_3 <- sample(1:16, 8)
+val_bucks_3 <- sample(c(1:16)[-train_bucks_3], 4)
+test_bucks_3 <- c(1:16)[-c(train_bucks_3, val_bucks_3)]
+
+training_set <- split_xy_16(img1, 2, 1) %>%
+  filter(group_lab %in% train_bucks_1) %>%
+  bind_rows(split_xy_16(img2, 2, 1) %>%
+              filter(group_lab %in% train_bucks_2)) %>%
+  bind_rows(split_xy_16(img3, 2, 1) %>%
+              filter(group_lab %in% train_bucks_3)) %>%
+  filter(expert_label %in% c(-1, 1))
+
+validation_set <- split_xy_16(img1, 2, 1) %>%
+  filter(group_lab %in% val_bucks_1) %>%
+  bind_rows(split_xy_16(img2, 2, 1) %>%
+              filter(group_lab %in% val_bucks_2)) %>%
+  bind_rows(split_xy_16(img3, 2, 1) %>%
+              filter(group_lab %in% val_bucks_3)) %>%
+  filter(expert_label %in% c(-1, 1))
+
+testing_set <- split_xy_16(img1, 2, 1) %>%
+  filter(group_lab %in% test_bucks_1) %>%
+  bind_rows(split_xy_16(img2, 2, 1) %>%
+              filter(group_lab %in% test_bucks_2)) %>%
+  bind_rows(split_xy_16(img3, 2, 1) %>%
+              filter(group_lab %in% test_bucks_3)) %>%
+  filter(expert_label %in% c(-1, 1))
+
+```
+
+
+```{r}
+
+# =========================================================
+# Part B: Trivial Classifier
+# =========================================================
+
+validation_set %>%
+  mutate(Type = "Validation") %>%
+  bind_rows(testing_set %>%
+              mutate(Type = "Test")) %>%
+  mutate(`Splitting Method` = 2) %>%
+  bind_rows(img1 %>%
+              mutate(Type = "Validation") %>%
+              bind_rows(img2 %>%
+                          mutate(Type = "Test")) %>%
+              mutate(`Splitting Method` = 1)) %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(baseline_pred = -1) %>%
+  # This gives the overall combined accuracy, which I mention in the report as 60%.
+  #pull(expert_label) %>% (function(x) {mean(x == -1)})
+  group_by(`Splitting Method`, Type) %>%
+  summarize(`Baseline Accuracy` = round(mean(baseline_pred == expert_label), 3))%>%
+  htmlTable(rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Accuracy of a Trivial Classifier")
+```
+
+
+```{r}
+# =========================================================
+# Part C: First Order Importance
+# =========================================================
+
+# deep copy
+training_set_small_names <- data.frame(training_set)
+names(training_set_small_names) <- str_replace_all(names(training_set_small_names),
+                                                   "Radiance_angle",
+                                                   "rad_ang")
+
+training_set_small_names %>%
+  select(-c(y_coordinate, x_coordinate, x_group, y_group, group_lab)) %>%
+  melt(id.vars = "expert_label") %>%
+  mutate(expert_label_factor = factor(expert_label, labels = c("No Clouds", "Yes Clouds"))) %>%
+  ggplot(aes(x = expert_label_factor, y = value)) +
+    facet_wrap(~variable, scales = "free") +
+    geom_boxplot() +
+    labs(title = "Conditional Boxplots for Feature Importance",
+         x = "Class",
+         y = "Value") + 
+    theme_clean()
+ggsave("images/conditional_boxplots.png", height = 5, width = 7, units = "in", dpi = 300)
+
+training_cor <- cor(training_set_small_names %>%
+  select(expert_label:rad_ang_AN))
+
+feature_sds <- training_set_small_names %>%
+  select(NDAI:rad_ang_AN) %>%
+  summarize_all(sd) %>% melt() %>%
+  rename(stdev = value)
+
+# Best features are NDAI, CORR, Radiance_angle_AF
+training_set_small_names %>%
+  select(expert_label:rad_ang_AN) %>%
+  melt(id.vars = "expert_label") %>%
+  group_by(expert_label, variable) %>%
+  summarize_all(mean) %>%
+  rename(mean_val = value) %>%
+  ungroup() %>%
+  group_by(variable) %>%
+  summarize(difference = max(mean_val) - min(mean_val)) %>%
+  ungroup() %>%
+  merge(feature_sds, by = "variable") %>%
+  mutate(mean_standard_difference = difference/stdev) %>%
+  arrange(-mean_standard_difference) %>%
+  mutate(variable = factor(variable,
+                          levels = variable)) %>%
+  ggplot(aes(x = variable, y = mean_standard_difference)) +
+    geom_bar(stat = "identity", fill = "light blue") +
+    labs(title = "First Order Feature Importance",
+         x = "Feature",
+         y = "Mean Standardized Difference Between Classes") +
+    theme_clean() +
+     theme(
+      axis.text.x = element_text(angle = 45, hjust = 1) 
+    ) 
+ggsave("images/first_order_feature_importance.png", height = 4, width = 8, units = "in", dpi = 300)
+
+# Correlation Plot. Interesting but not in our final report.
+par(xpd=T)
+corrplot(training_cor, type="upper", order="original",
+tl.col="black", tl.srt=45, mar = c(0, 0, 2, 0),
+main = "Correlation Plot for Features and Response",
+ylab = "Correlation")
+```
+
+
+```{r}
+# =========================================================
+# Part D: CVgeneric
+# =========================================================
+
+# The implementation and documentation for CVgeneric,
+# as well as many helper functions it will use, is included
+# in helpers.R
+```
+
+# Part 3: Modeling
+
+```{r}
+# =========================================================
+# Part A: Try Several Classification Models
+# =========================================================
+# Training Set for Test Accuracy
+
+train <- training_set %>%
+  select(NDAI:Radiance_angle_AN)
+
+# (1) Logistic Regression
+
+# Fold Method 1: Separate Images
+
+method_1_CV_logistic <- CVgeneric(log_reg_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16)
+# 0.7916091 0.7140134 0.9690214 0.8139192 0.7918912 0.9988690 0.6986979
+# Average across folds
+mean(CVgeneric(log_reg_classifier,method_1_train_and_valid_features,
+               method_1_train_and_valid_response, 7,
+               compute_standard_acc,folds_from_separate_imgs, random_seed = 16))
+
+# Average: 0.8254316
+
+# Test Accuracy
+
+method_1_train <- method_1_train_and_valid_features
+method_1_train$y_coordinate <- NULL
+method_1_train$x_coordinate <- NULL
+
+method_1_test <- method_1_test_features
+method_1_test$y_coordinate <- NULL
+method_1_test$x_coordinate <- NULL
+
+mean(method_1_test_response == log_reg_classifier(method_1_train, method_1_train_and_valid_response, method_1_test))
+
+# 0.9301505
+
+
+
+# Fold Method 2: folds_from_xy_16
+train_and_valid_features <- training_set %>%
+  bind_rows(validation_set) %>%
+  select(NDAI:image, group_lab)
+
+# Just a vector of 0 and 1
+train_and_valid_response <- training_set %>%
+  bind_rows(validation_set) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+
+method_2_CV_logistic <- CVgeneric(log_reg_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16)
+#  0.8883270 0.9175524 0.8425550 0.8559687 0.9319283 0.7297205 0.7716318
+# Average across folds
+mean(CVgeneric(log_reg_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16))
+
+
+# Average = 0.8482405
+
+# Test Accuracy
+
+
+
+train_and_val <- train_and_valid_features
+train_and_val$image <- NULL
+train_and_val$group_lab <- NULL
+
+test <- testing_set %>%
+  select(NDAI:Radiance_angle_AN)
+
+# Just a vector of 0 and 1
+test_response <- testing_set %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+mean(test_response == log_reg_classifier(train_and_val, train_and_valid_response, test))
+
+# 0.9196169
+
+
+# (2) LDA (referred to lda_qda_n18.pdf)
+
+# Fold Method 1: Separate Images
+
+method_1_CV_lda <-CVgeneric(lda_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16)
+# 0.8140339 0.7515538 0.9730697 0.8446868 0.7967908 0.9988690 0.7019531
+# Average across folds
+mean(CVgeneric(lda_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16))
+
+# Average: 0.84
+
+# Test Accuracy
+mean(method_1_test_response == lda_classifier(method_1_train, method_1_train_and_valid_response, method_1_test))
+
+
+# 0.9364683
+
+
+# Fold Method 2: folds_from_xy_16
+method_2_CV_lda <-CVgeneric(lda_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16)
+# 0.8816688 0.9166920 0.8442814 0.8638495 0.9340250 0.7580747 0.7738895
+
+# Average across folds
+mean(CVgeneric(lda_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16))
+
+# Average: 0.8532115
+
+# Test Accuracy 
+
+mean(test_response == lda_classifier(train_and_val, train_and_valid_response, test))
+# 0.9246819
+
+
+# (3) QDA
+
+# Fold Method 1: Separate Images
+
+method_1_CV_qda <-CVgeneric(qda_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16)
+# 0.8645005 0.7331565 0.9903778 0.7962700 0.7281970 0.9969116 0.6884766
+# Average across folds
+mean(CVgeneric(qda_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16))
+
+
+# Average: 0.82827
+
+# Test Accuracy
+
+mean(method_1_test_response == qda_classifier(method_1_train, method_1_train_and_valid_response, method_1_test))
+
+
+# 0.9364683
+
+# Fold Method 2: Folds 16
+
+method_2_CV_qda <-CVgeneric(qda_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16)
+#  0.8994943 0.9522219 0.8525680 0.8960982 0.9460993 0.6622077 0.7797596
+# Average across folds
+mean(CVgeneric(qda_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16))
+
+
+# Average: 0.8554927
+
+# Test Accuracy
+
+mean(test_response == qda_classifier(train_and_val, train_and_valid_response, test))
+
+# 0.9528246
+
+# (4) KNN
+
+# First Some Checking to See optimal k. Commented out Because it takes a really long time to run
+
+knn_factory <- function(k_choice) {
+  # Return a knn classifier for the input k
+  knn_classifier <- function(training_data, training_labels, new_data, this_k = k_choice) {
+  this_fit <- knn(training_data, new_data, training_labels, k = this_k)
+  return(this_fit)
+  }
+  return(knn_classifier)
+}
+
+# knn_3_accs <- CVgeneric(knn_factory(3), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16)
+# knn_4_accs <- CVgeneric(knn_factory(4), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16)
+# knn_5_accs <- CVgeneric(knn_factory(5), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16)
+# knn_6_accs <- CVgeneric(knn_factory(6), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16)
+# 
+# 
+# knn_500_accs <- CVgeneric(knn_factory(500), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16)
+# 
+# knn_500_accs
+# 
+# ks_to_try <- 1:11
+# knn_grid_search <- function(ks_to_try) {
+#   accs <- numeric(length(ks_to_try))
+#   for (i in 1:length(ks_to_try)) {
+#     accs[i] <- mean(CVgeneric(knn_factory(ks_to_try[i]), train_and_valid_features,
+#           train_and_valid_response, 5,
+#           compute_standard_acc, folds_from_xy_16))
+#     print(accs[i])
+#   }
+#   return(accs)
+# }
+# knn_grid_search_results <- knn_grid_search(ks_to_try)
+
+
+# Fold Method 1: Separate Images
+method_1_CV_KNN <-CVgeneric(knn7_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16)
+# 0.8672658 0.7180741 0.7380897 0.9222380 0.6768128 0.9317935 0.5968099
+# Average across folds
+mean(CVgeneric(knn7_classifier,method_1_train_and_valid_features,method_1_train_and_valid_response, 7, compute_standard_acc,folds_from_separate_imgs, random_seed = 16))
+
+
+# Average: 0.7787263
+
+# Test Accuracy
+
+mean(method_1_test_response == knn7_classifier(method_1_train, method_1_train_and_valid_response, method_1_test))
+
+
+# Fold Method 2: 16 folds
+
+# CV Accuracy
+
+method_2_CV_KNN <-CVgeneric(knn7_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16)
+#  0.9185419 0.9089483 0.7746655 0.6984480 0.8924517 0.7580747 0.8086019
+# Average across folds
+mean(CVgeneric(knn7_classifier,train_and_valid_features,train_and_valid_response, 7, compute_standard_acc,folds_from_xy_16, random_seed = 16))
+
+# Average: 0.8228189
+
+#Test Accuracy
+
+mean(test_response == knn7_classifier(train_and_val, train_and_valid_response, test))
+
+
+#0.9253388
+
+
+
+# MAKING TABLES
+
+method_1_CV <- cbind(method_1_CV_logistic, method_1_CV_lda, method_1_CV_qda, method_1_CV_KNN)
+method_2_CV <- cbind(method_2_CV_logistic, method_2_CV_lda, method_2_CV_qda, method_2_CV_KNN)
+colnames(method_1_CV) <- c("Logistic Regression", "LDA", "QDA", "KNN")
+colnames(method_2_CV) <- c("Logistic Regression", "LDA", "QDA", "KNN")
+
+method_1_CV <- round(method_1_CV, 3)
+method_2_CV <- round(method_2_CV, 3)
+htmlTable(method_1_CV, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 1: CV Accuracies Across 7 Folds")
+
+htmlTable(method_2_CV, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 2: CV Accuracies Across 7 Folds")
+
+
+# Overall CV Accuracies Averages
+ 
+methods <- c("Logistic Regression", "LDA", "QDA", "KNN")
+method_1_CV_averages <- c(0.8254316,0.8401367,0.82827,0.7787263)
+method_1_CV_averages <- data.frame("Methods" = methods,"Average" = round(method_1_CV_averages,3))
+
+
+method_2_CV_averages <- c(0.8482405,0.8532115,0.8554927,0.8228189)
+method_2_CV_averages <- data.frame("Methods" = methods,"Average" = round(method_2_CV_averages,3))
+
+htmlTable(method_1_CV_averages, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 1: Overall CV Averages Across 7 Folds")
+
+htmlTable(method_2_CV_averages, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 2: Overall CV Averages Across 7 Folds")
+
+
+# Test Accuracies
+
+method_1_test <- c(0.9301505,0.9364683, 0.9584043,0.7728125)
+method_1_test <- data.frame("Methods" = methods,"Test Accuracy" = round(method_1_test,3))
+method_2_test <- c(0.9196169,0.9246819,0.9528246, 0.9253388)
+method_2_test <- data.frame("Methods" = methods,"Test Accuracy" = round(method_2_test,3))
+
+htmlTable(method_1_test, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 1: Test Accuracy")
+
+htmlTable(method_2_test, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Fold Method 2: Test Accuracy")
+```
+
+
+```{r}
+
+# =========================================================
+# Part B: Use ROC Curves to Compare Different Methods
+# =========================================================
+library(ROCR)
+library(pROC)
+
+# Split Method 1: 
+
+method_1_training_set_roc <- img1 %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  select(expert_label, NDAI, CORR, Radiance_angle_AF)
+
+method_1_training_set_responses_roc <- method_1_training_set_roc$expert_label
+
+method_1_validation_set_roc1 <- img3 %>%
+  filter(expert_label %in% c(-1, 1)) %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  select(expert_label, NDAI, CORR, Radiance_angle_AF)
+
+method_1_validation_set_roc <- method_1_validation_set_roc1 %>%
+  select("NDAI", "CORR", "Radiance_angle_AF")
+
+method_1_validation_set_responses_roc <-method_1_validation_set_roc1$expert_label
+
+
+# Logistic
+
+logisticFitMethod1 <- glm(expert_label ~., data = method_1_training_set_roc, family = binomial)
+probslogisticMethod1 <- predict(logisticFitMethod1, method_1_validation_set_roc)
+pred_logMethod1 <- prediction(probslogisticMethod1, method_1_validation_set_responses_roc)
+perf_logMethod1 <- performance(pred_logMethod1, "tpr", "fpr")
+p1 <- plot(perf_logMethod1)
+
+
+# LDA
+
+ldaFit <- lda(expert_label ~., data = method_1_training_set_roc)
+probslda <- predict(ldaFit, method_1_validation_set_roc, type = "response")$posterior[,2]
+pred_lda <- prediction(probslda, method_1_validation_set_responses_roc)
+perf_lda <- performance(pred_lda, "tpr","fpr")
+p2 <- plot(perf_lda)
+
+
+# QDA
+
+qdaFit <- qda(expert_label ~., data = method_1_training_set_roc)
+probsqda <- predict(qdaFit, method_1_validation_set_roc, type = "response")$posterior[,2]
+pred_qda <- prediction(probsqda, method_1_validation_set_responses_roc)
+perf_qda <- performance(pred_qda, "tpr","fpr")
+p3 <- plot(perf_qda)
+
+
+# KNN
+
+method_1_training_set_roc_knn <- method_1_training_set_roc %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+method_1_train_pos_neg_response <- ifelse(method_1_training_set_responses_roc == 0, -1, 1)
+knnFit <- knn(method_1_training_set_roc_knn, method_1_validation_set_roc, method_1_train_pos_neg_response, 7, prob = TRUE)
+
+pred_knn_prediction <- prediction(method_1_validation_set_responses_roc, knnFit)
+pred_knn_performance <- performance(pred_knn_prediction, "tpr", "fpr")
+p4 <- plot(pred_knn_performance)
+
+# Calculating Cutoffs
+
+# Source: Strictlystat. A Small Introduction to the ROCR Package. A HopStat and Jump Away, 22 Dec. 2014, hopstat.wordpress.com/2014/12/19/a-small-introduction-to-the-rocr-package/.
+
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+
+knnOpt <- opt.cut(pred_knn_performance, pred_knn_prediction)
+knnOptSense <- knnOpt[1,1]
+knnOptSpec <- knnOpt[2,1]
+
+logOpt <- opt.cut(perf_logMethod1, pred_logMethod1)
+logOptSense <- logOpt[1,1]
+logOptSpec <- logOpt[2,1]
+
+ldaOpt <- opt.cut(perf_lda, pred_lda)
+ldaOptSense <- ldaOpt[1,1]
+ldaOptSpec <- logOpt[2,1]
+
+qdaOpt <- opt.cut(perf_qda, pred_qda)
+qdaOptSense <- qdaOpt[1,1]
+qdaOptSpec <- qdaOpt[2,1]
+
+
+
+x <- c(0.000000, 0.406181, 1.000000)
+y <- c(0.0000000, 0.3857785, 1.0000000)
+preds_list <- list(probslogisticMethod1, probslda, probsqda)
+pred <- prediction(preds_list, rep(list(method_1_validation_set_responses_roc), 3))
+rocs <- performance(pred,"tpr", "fpr")
+plot(rocs, col = list("red", "green", "yellow"), main = "Method 1: ROC Curves on Validation Set", xlab = "False Positive Rate", ylab = "True Positive Rate")
+lines(x,y)
+points(1 - logOptSpec, logOptSense, pch = 20)
+points(1 - ldaOptSpec, ldaOptSense, pch = 20)
+points(1 - qdaOptSpec, qdaOptSense, pch = 20)
+points(1- knnOptSpec, knnOptSense, pch = 20)
+legend(0.65,0.4, legend = c("Logistic Regression", "LDA", "QDA", "KNN"), col = c("red", "green", "yellow", "black"), pch = 15)
+
+
+# Put all Cutoffs into Table
+
+
+cutoffs_method_1 <- c(logOpt[3,1], ldaOpt[3,1], qdaOpt[3,1], knnOpt[3,1])
+cutoffs_method_1 <- data.frame("Method" = methods, "Cutoff" = round(cutoffs_method_1,3))
+htmlTable(cutoffs_method_1, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Method 1: Cutoff Values")
+
+```
+
+
+```{r}
+# Method 2 ROC CURVE
+
+training_set_roc <- training_set %>%
+  select("NDAI", "CORR", "Radiance_angle_AF")
+
+training_set_responses_roc <- training_set %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+training_set_roc <- cbind(training_set_roc,training_set_responses_roc)
+
+validation_set_roc <- validation_set %>%
+  select("NDAI", "CORR", "Radiance_angle_AF")
+
+validation_set_responses_roc <- validation_set %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+
+# Logistic
+
+logisticFit <- glm(training_set_responses_roc ~., data = training_set_roc, family = binomial)
+probslogistic <- predict(logisticFit, validation_set_roc)
+pred_log <- prediction(probslogistic, validation_set_responses_roc)
+perf_log <- performance(pred_log, "tpr", "fpr")
+p1 <- plot(perf_log)
+
+
+# LDA
+
+ldaFit <- lda(training_set_responses_roc ~., data = training_set_roc)
+probslda <- predict(ldaFit, validation_set_roc, type = "response")$posterior[,2]
+pred_lda <- prediction(probslda, validation_set_responses_roc)
+perf_lda <- performance(pred_lda, "tpr","fpr")
+p2 <- plot(perf_lda)
+
+
+# QDA
+
+qdaFit <- qda(training_set_responses_roc ~., data = training_set_roc)
+probsqda <- predict(qdaFit, validation_set_roc, type = "response")$posterior[,2]
+pred_qda <- prediction(probsqda, validation_set_responses_roc)
+perf_qda <- performance(pred_qda, "tpr","fpr")
+p3 <- plot(perf_qda)
+
+
+# KNN
+
+training_set_roc_knn <- training_set_roc %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+train_pos_neg_response <- ifelse(training_set_responses_roc == 0, -1, 1)
+knnFit <- knn(training_set_roc_knn, validation_set_roc, train_pos_neg_response, 7, prob = TRUE)
+
+pred_knn_prediction <- prediction(validation_set_responses_roc, knnFit)
+pred_knn_performance <- performance(pred_knn_prediction, "tpr", "fpr")
+p4 <- plot(pred_knn_performance)
+
+
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+
+knnOpt <- opt.cut(pred_knn_performance, pred_knn_prediction)
+knnOptSense <- knnOpt[1,1]
+knnOptSpec <- knnOpt[2,1]
+
+logOpt <- opt.cut(perf_log, pred_log)
+logOptSense <- logOpt[1,1]
+logOptSpec <- logOpt[2,1]
+
+ldaOpt <- opt.cut(perf_lda, pred_lda)
+ldaOptSense <- ldaOpt[1,1]
+ldaOptSpec <- logOpt[2,1]
+
+qdaOpt <- opt.cut(perf_qda, pred_qda)
+qdaOptSense <- qdaOpt[1,1]
+qdaOptSpec <- qdaOpt[2,1]
+
+
+# ROC CUrve for Method 2
+
+x <- c(0.00000000, 0.09848457, 1.00000000)
+y <- c(0.0000000, 0.5475842, 1.0000000)
+preds_list <- list(probslogistic, probslda, probsqda)
+pred <- prediction(preds_list, rep(list(validation_set_responses_roc), 3))
+rocs <- performance(pred,"tpr", "fpr")
+plot(rocs, col = list("red", "green", "yellow"), main = "Method 2: ROC Curves on Validation Set", xlab = "False Positive Rate", ylab = "True Positive Rate")
+lines(x,y)
+points(1 - logOptSpec, logOptSense, pch = 20)
+points(1 - ldaOptSpec, ldaOptSense, pch = 20)
+points(1 - qdaOptSpec, qdaOptSense, pch = 20)
+points(1- knnOptSpec, knnOptSense, pch = 20)
+legend(0.75,0.3, legend = c("Logistic Regression", "LDA", "QDA", "KNN"), col = c("red", "green", "yellow", "black"),pch = 15, cex=0.8)
+axis(2, at=0:1, las=2)
+axis(1, at=0:1, las=2)
+
+
+# Cutoffs into table
+
+cutoffs_method_2 <- c(logOpt[3,1], ldaOpt[3,1], qdaOpt[3,1], knnOpt[3,1])
+cutoffs_method_2 <- data.frame("Method" = methods, "Cutoff" = round(cutoffs_method_2,3))
+htmlTable(cutoffs_method_2, rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 4em; padding-right: 4em;", caption = "Method 2: Cutoff Values")
+```
+
+
+# Part 4: Diagnostics 
+
+```{r}
+train_valid_features_m1_small <-  method_1_train_and_valid_features %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+
+
+test_features_m1_small <- method_1_test_features %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+
+
+# =========================================================
+# Part A: In Depth Analysis
+# =========================================================
+
+# Data perturbing
+
+set.seed(84738393)
+preturbed_accs <- numeric(250)
+for (i in 1:250) {
+  preturbed_accs[i] <- train_valid_features_m1_small %>%
+  mutate(NDAI = NDAI + rnorm(nrow(.),0, sd(NDAI)),
+         CORR = CORR + rnorm(nrow(.),0, sd(CORR)),
+         Radiance_angle_AF = rnorm(nrow(.), 0, sd(Radiance_angle_AF))) %>%
+  qda_classifier_with_prob(method_1_train_and_valid_response,
+                 test_features_m1_small, .2) %>%
+  compute_standard_acc(method_1_test_response)
+}
+
+# Average perturbed accuracy is 91.1%
+mean(preturbed_accs)
+
+data.frame(preturbed_accs = preturbed_accs) %>%
+  ggplot(aes(x= preturbed_accs, y = ..density..)) +
+    geom_histogram(fill = "light blue") +
+    geom_density() +
+    labs(title = "Stability Analysis: Perturbing the Data",
+         x = "Accuracy",
+         y = "Density") +
+    theme_clean()
+
+ggsave("images/data_perturb.png", height = 5, width = 7, units = "in", dpi = 300)
+
+# Time Complexity Analysis
+
+qda_times <- numeric(20)
+lda_times <- numeric(20)
+logreg_times <- numeric(20)
+knn_times <- numeric(20)
+
+for (i in 1:20) {
+  qda_start <- Sys.time()
+  qda_results <- qda_classifier(train_valid_features_m1_small,
+                                method_1_train_and_valid_response,
+                                test_features_m1_small)
+  qda_times[i] <- Sys.time() - qda_start
+  
+  lda_start <- Sys.time()
+  lda_results <- lda_classifier(train_valid_features_m1_small,
+                                method_1_train_and_valid_response,
+                                test_features_m1_small)
+  lda_times[i] <- Sys.time() - lda_start
+  
+  logreg_start <- Sys.time()
+  logreg_results <- log_reg_classifier(train_valid_features_m1_small,
+                                method_1_train_and_valid_response,
+                                test_features_m1_small)
+  logreg_times[i] <- Sys.time() - logreg_start
+  
+  knn_start <- Sys.time()
+  knn_results <- knn7_classifier(train_valid_features_m1_small,
+                                method_1_train_and_valid_response,
+                                test_features_m1_small)
+  knn_times[i] <- Sys.time() - knn_start
+}
+
+data.frame(run = 1:20,
+                               QDA = qda_times,
+                               LDA = lda_times,
+                               Logistic = logreg_times,
+                               KNN = knn_times) %>%
+  melt(id.vars = "run") %>%
+  mutate(`Slow Method` = ifelse(variable == "KNN", "Slow", "Fast")) %>%
+  rename(Method = variable) %>%
+  ggplot(aes(x = value, fill = Method)) +
+    facet_wrap(~`Slow Method`, scales = "free") +
+    geom_density() +
+    labs(title = "Empirical Time Efficiency and Stability",
+         x = "Time to Predict (Seconds)",
+         y = "Density") +
+    theme_clean()
+
+ggsave("images/time_complex_stab.png", height = 5, width = 7, units = "in", dpi = 300)
+  
+
+# How close or sure are we on correct and incorrect results
+
+qda_classifier_probabilities <- function(training_data, training_labels, new_data) {
+  appended_data <- training_data %>%
+    mutate(answers = training_labels)
+  
+  qda_model <- qda(answers ~ .,
+                   data = appended_data)
+  
+  qda_preds <- predict(qda_model, new_data)
+  # Probability of cloud class
+  return(qda_preds$posterior[,2])
+}
+
+
+test_features_m1_small %>%
+  mutate(prob_class_1 = qda_classifier_probabilities(train_valid_features_m1_small,
+                                                     method_1_train_and_valid_response,
+                                                     test_features_m1_small),
+        # prediction = prob_class_1 > .22,
+        prediction = prob_class_1 > .3,
+         expert_label = method_1_test_response,
+         #correct = prediction == expert_label) %>% pull(correct) %>% mean
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))))) %>%
+  ggplot(aes(x = prob_class_1)) +
+    facet_wrap(~Class, scales = "free") +
+    geom_density() +
+    labs(title = "Probabilistic Output of QDA Model by Outcome",
+         x = "Predicted Probability of Clouds",
+         y = "Density") +
+    theme_clean()
+
+ggsave("images/prob_output_qda.png", height = 5, width = 7, units = "in", dpi = 300)
+
+# Can we trust the probability output of the QDA model?  
+
+test_features_m1_small %>%
+  mutate(prob_class_1 = qda_classifier_probabilities(train_valid_features_m1_small,
+                                                     method_1_train_and_valid_response,
+                                                     test_features_m1_small),
+      prediction_bin = round(prob_class_1, 2),
+         expert_label = method_1_test_response) %>%
+  group_by(prediction_bin) %>%
+  summarize(countn = n(),
+            mean_prediction = mean(prob_class_1),
+            mean_outcome = mean(expert_label)) %>%
+  ggplot(aes(x = mean_prediction, y = mean_outcome)) +
+    geom_point(size = 1.5) +
+    geom_abline(slope = 1, intercept = 0, size = 1.2) +
+    #geom_vline(xintercept = .3) +
+    annotate("text", x = .75, y = .68, label = "y = x", size = 5) +
+    labs(title = "Evaluating the Probabilistic QDA Predictions",
+         x = "Cloudy Prediction Bin (0 to 100%)",
+         y = "Average Outcome") +
+    theme_clean()
+
+ggsave("images/qda_prob_interp.png", height = 5, width = 7, units = "in", dpi = 300)
+
+```
+
+```{r}
+# =========================================================
+# Part B: Patterns in Misclassification
+# =========================================================
+
+method_1_test_features %>%
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m1_small,
+                                    method_1_train_and_valid_response,
+                                    test_features_m1_small) ,
+         expert_label = method_1_test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  ggplot(aes(x = x_coordinate, y = -y_coordinate, color = `Class`)) +
+    geom_point() + 
+    labs(title = "Spatially Dependent Modeling Errors",
+         x = "X Coordinate",
+         y = "Negative Y Coordinate") +
+    theme_clean() 
+ggsave("images/diagnostics_spatial_1.png", height = 5, width = 7, units = "in", dpi = 300)
+
+
+method_1_test_features %>%
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m1_small,
+                                    method_1_train_and_valid_response,
+                                    test_features_m1_small),
+         expert_label = method_1_test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  group_by(`Class`) %>%
+  summarize(Proportion = round(n()/nrow(method_1_test_features), 3)) %>%
+  htmlTable(rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 2em; padding-right: 2em;", caption = "In Depth Accuracy of 3 Feature QDA")
+
+
+# Look for problems in specific ranges of feature values
+
+method_1_test_features %>%
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m1_small,
+                                    method_1_train_and_valid_response,
+                                    test_features_m1_small),
+         expert_label = method_1_test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  select(NDAI, CORR, Radiance_angle_AF, Class) %>%
+  melt(id.vars = "Class") %>%
+  ggplot(aes(x = value, color = Class)) +
+    facet_wrap(~variable, scales = "free") +
+    geom_density(size = 1.5) +
+    labs(title = "Distribution of Parameter Values for Each Outcome Class",
+         x = "Value",
+         y = "Density") +
+    theme_clean()
+ggsave("images/param_values_by_class.png", height = 5, width = 7, units = "in", dpi = 300)
+
+
+```
+
+```{r}
+# =========================================================
+# Part C: Better Classifier
+# =========================================================
+
+best_model_guesses <- qda_classifier_with_prob(train_valid_features_m1_small,
+                                    method_1_train_and_valid_response,
+                                    test_features_m1_small)
+
+
+
+# Make a knn function that uses k = 100
+knn_100_function <- knn_factory(100)
+updated_guesses <- knn_100_function(method_1_test_features %>% select(y_coordinate, x_coordinate),
+                                    best_model_guesses,
+                                    method_1_test_features %>% select(y_coordinate, x_coordinate))
+
+# Now the accuracy is 95.5%
+compute_standard_acc(as.logical(updated_guesses), method_1_test_response)
+
+method_1_test_features %>%
+  mutate(first_prediction = best_model_guesses,
+         updated_prediction = as.logical(updated_guesses),
+         expert_label = method_1_test_response,
+         correct = updated_prediction == expert_label,
+  #pull(correct) %>% mean()#,
+         `Class` = factor(ifelse(updated_prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(updated_prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  ggplot(aes(x = x_coordinate, y = -y_coordinate, color = `Class`)) +
+    geom_point() + 
+    labs(title = "Second Pass Modeling Errors",
+         x = "X Coordinate",
+         y = "Negative Y Coordinate") +
+    theme_clean()
+ggsave("images/upading_classifier.png", height = 5, width = 7, units = "in")
+
+method_1_test_features %>%
+  mutate(first_prediction = best_model_guesses,
+         updated_prediction = as.logical(updated_guesses),
+         expert_label = method_1_test_response,
+         correct = updated_prediction == expert_label,
+         `Class` = factor(ifelse(updated_prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(updated_prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  group_by(`Class`) %>%
+  summarize(Proportion = round(n()/nrow(method_1_test_features), 3)) %>%
+  htmlTable(rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 2em; padding-right: 2em;", caption = "Second Pass Accuracy Breakdown")
+
+```
+
+```{r}
+# =========================================================
+# Part D: Re-Do with Split Method 2
+# =========================================================
+
+train_valid_features_m2_small <-  train_and_valid_features %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+
+
+test_features_m2_small <- test_features %>%
+  select(NDAI, CORR, Radiance_angle_AF)
+
+test_response <- testing_set %>%
+  mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
+  pull(expert_label)
+
+compute_standard_acc(qda_classifier_with_prob(train_valid_features_m2_small,
+                                    train_and_valid_response,
+                                    test_features_m2_small),
+                     test_response)
+
+
+# Part A re do
+
+# Data perturbing
+
+set.seed(84738393)
+preturbed_accs_method_2 <- numeric(250)
+for (i in 1:250) {
+  preturbed_accs_method_2[i] <- train_valid_features_m2_small %>%
+  mutate(NDAI = NDAI + rnorm(nrow(.),0, sd(NDAI)),
+         CORR = CORR + rnorm(nrow(.),0, sd(CORR)),
+         Radiance_angle_AF = rnorm(nrow(.), 0, sd(Radiance_angle_AF))) %>%
+  qda_classifier_with_prob(train_and_valid_response,
+                 test_features) %>%
+  compute_standard_acc(test_response)
+}
+
+# Average perturbed accuracy is 91.1%
+mean(preturbed_accs_method_2)
+
+data.frame(preturbed_accs = preturbed_accs_method_2) %>%
+  ggplot(aes(x= preturbed_accs, y = ..density..)) +
+    geom_histogram(fill = "light blue") +
+    geom_density() +
+    labs(title = "Stability Analysis: Perturbing the Data",
+         subtitle = "*Using Data Split Method 2",
+         x = "Accuracy",
+         y = "Density") +
+    theme_clean()
+
+ggsave("images/data_perturb_method_2.png", height = 5, width = 7, units = "in", dpi = 300)
+
+
+# Note that it makes no sense to try the time complexity again because the splitting method
+# and dependence structure does not have an impact ont he time complexity of fitting the 
+# different models. This part is not replicated.
+
+# Probability Output re do
+test_features_m2_small %>%
+  mutate(prob_class_1 = qda_classifier_probabilities(train_valid_features_m2_small,
+                                                     train_and_valid_response,
+                                                     test_features_m2_small),
+        # prediction = prob_class_1 > .22,
+        prediction = prob_class_1 > .3,
+         expert_label = test_response,
+         #correct = prediction == expert_label) %>% pull(correct) %>% mean
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))))) %>%
+  ggplot(aes(x = prob_class_1)) +
+    facet_wrap(~Class, scales = "free") +
+    geom_density() +
+    labs(title = "Probabilistic Output of QDA Model by Outcome",
+         subtitle = "*Second Splitting Method",
+         x = "Predicted Probability of Clouds",
+         y = "Density") +
+    theme_clean()
+ggsave("images/prob_output_qda_method_2.png", height = 5, width = 7, units = "in", dpi = 300)
+
+# Violated Assumptions Re Do
+qda_quantiles_method_2 <- quantile(qda_classifier_probabilities(train_valid_features_m2_small,
+                                                     train_and_valid_response,
+                                                     test_features_m2_small),
+         seq(0, 1, .01))
+test_features_m2_small %>%
+  mutate(prob_class_1 = qda_classifier_probabilities(train_valid_features_m2_small,
+                                                     train_and_valid_response,
+                                                     test_features_m2_small),
+      prediction_bin = round(prob_class_1, 2),
+         expert_label = test_response) %>%
+  group_by(prediction_bin) %>%
+  summarize(countn = n(),
+            mean_prediction = mean(prob_class_1),
+            mean_outcome = mean(expert_label)) %>%
+  ggplot(aes(x = mean_prediction, y = mean_outcome)) +
+    geom_point(size = 1.5) +
+    geom_abline(slope = 1, intercept = 0, size = 1.2) +
+    #geom_vline(xintercept = .3) +
+    annotate("text", x = .75, y = .68, label = "y = x", size = 5) +
+    labs(title = "Method 2: Evaluating the Probabilistic QDA Predictions",
+         x = "Cloudy Prediction Bin (0 to 100%)",
+         y = "Average Outcome") +
+    theme_clean()
+
+ggsave("images/qda_prob_interp_method_2.png", height = 5, width = 7, units = "in", dpi = 300)
+
+
+
+# Spatial Dependence Structure for Second Method
+
+test_features <- testing_set %>%
+  select(NDAI:image, group_lab, x_coordinate, y_coordinate)
+
+test_features %>% 
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m2_small,
+                                    train_and_valid_response,
+                                    test_features_m2_small) ,
+         expert_label = test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  ggplot(aes(x = x_coordinate, y = -y_coordinate, color = `Class`)) +
+    facet_wrap(~image) +
+    geom_point() + 
+    labs(title = "Spatially Dependent Modeling Errors",
+         subtitle = "*Using second splitting method; facets are images.",
+         x = "X Coordinate",
+         y = "Negative Y Coordinate") +
+    theme_clean() 
+ggsave("images/diagnostics_spatial_method_2.png", height = 5, width = 7, units = "in", dpi = 300)
+
+# Four Classes of predictions Table
+test_features %>%
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m2_small,
+                                    train_and_valid_response,
+                                    test_features_m2_small),
+         expert_label = test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  group_by(`Class`) %>%
+  summarize(Proportion = round(n()/nrow(test_features), 3)) %>%
+  htmlTable(rnames = FALSE, align = "c", col.rgroup =  c("none", "#F7F7F7"), align.header = "c", css.cell = "padding-left: 2em; padding-right: 2em;", caption = "In Depth Accuracy of 3 Feature QDA")
+
+
+# Parameter Separation for each class
+test_features %>%
+  mutate(prediction = qda_classifier_with_prob(train_valid_features_m2_small,
+                                    train_and_valid_response,
+                                    test_features_m2_small),
+         expert_label = test_response,
+         `Class` = factor(ifelse(prediction == expert_label & expert_label == 1,
+                          "True Positive",
+                          ifelse(prediction == expert_label & expert_label == 0,
+                                 "True Negative",
+                                 ifelse(expert_label == 1,
+                                        "False Negative",
+                                        "False Positive"))),
+         levels = c("False Positive", "False Negative", "True Negative", "True Positive"))) %>%
+  select(NDAI, CORR, Radiance_angle_AF, Class) %>%
+  melt(id.vars = "Class") %>%
+  ggplot(aes(x = value, color = Class)) +
+    facet_wrap(~variable, scales = "free") +
+    geom_density(size = 1.2) +
+    labs(title = "Distribution of Parameter Values for Each Outcome Class",
+         x = "Value",
+         y = "Density") +
+    theme_clean()
+ggsave("images/param_values_by_class_method_2.png", height = 5, width = 7, units = "in", dpi = 300)
+
+```
+
