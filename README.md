@@ -5,10 +5,10 @@ This repository contains the following files:
 
 1) [`Project2_Full_Implementation.Rmd`](./Project2_Full_Implementation.Rmd): Our full workbook with all of our relevant plots, cleaning, and tables.  
 2) [`helpers.R`](./helpers.R): An R Script file with helper functions needed for the analysis. It includes CVgeneric.  
-3) [STAT 154 Project 2.docx](./"STAT 154 Project 2.docx"): The Word file with our final report.  
-4) [STAT 154 Project 2.pdf](./"STAT 154 Project 2.pdf"): The pdf version of the above report.  
+3) [STAT 154 Project 2.docx](./STAT 154 Project 2.docx): The Word file with our final report.  
+4) [STAT 154 Project 2.pdf](./STAT 154 Project 2.pdf): The pdf version of the above report.  
 5) [Project2.pdf](./Project2.pdf): The instructions for this project.  
-6) [data](./data): A folder with the necessary data for this project.  
+6) [image_data](./image_data): A folder with the necessary data for this project.  
 7) This README file. 
 
 
