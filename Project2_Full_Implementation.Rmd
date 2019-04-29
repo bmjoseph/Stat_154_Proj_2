@@ -1486,9 +1486,12 @@ method_1_test_features %>%
 train_valid_features_m2_small <-  train_and_valid_features %>%
   select(NDAI, CORR, Radiance_angle_AF)
 
+test_features <- testing_set %>%
+  select(NDAI:image, group_lab, x_coordinate, y_coordinate)
 
 test_features_m2_small <- test_features %>%
   select(NDAI, CORR, Radiance_angle_AF)
+
 
 test_response <- testing_set %>%
   mutate(expert_label = ifelse(expert_label == -1, 0, 1)) %>%
@@ -1593,8 +1596,6 @@ ggsave("images/qda_prob_interp_method_2.png", height = 5, width = 7, units = "in
 
 # Spatial Dependence Structure for Second Method
 
-test_features <- testing_set %>%
-  select(NDAI:image, group_lab, x_coordinate, y_coordinate)
 
 test_features %>% 
   mutate(prediction = qda_classifier_with_prob(train_valid_features_m2_small,
